@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Continuous Tracking Test</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>แบบทดสอบการติดตามเป้าหมายต่อเนื่อง</h1>
+      <div class="controls">
+        <label>
+          รูปแบบ
+          <select id="patternSelect">
+            <option value="mixed">Mixed</option>
+            <option value="linear">Linear</option>
+            <option value="zigzag">Zig-Zag</option>
+            <option value="sinusoidal">Sinusoidal</option>
+            <option value="jitter">Random Jitter</option>
+          </select>
+        </label>
+
+        <label>
+          ระยะเวลา
+          <select id="durationSelect">
+            <option value="20">20s</option>
+            <option value="30" selected>30s</option>
+            <option value="45">45s</option>
+            <option value="60">60s</option>
+          </select>
+        </label>
+
+        <label>
+          Seed
+          <input id="seedInput" type="number" value="20260422" />
+        </label>
+
+        <button id="startBtn">เริ่มทดสอบ</button>
+        <button id="resetBtn">รีเซ็ต</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="play-area">
+        <canvas id="gameCanvas" width="1000" height="640"></canvas>
+        <div id="countdownOverlay" class="overlay hidden"></div>
+      </section>
+
+      <aside class="sidebar">
+        <div id="hudRoot"></div>
+
+        <div class="panel">
+          <h3>วิธีเล่น</h3>
+          <p>เลื่อนเมาส์ให้เคอร์เซอร์อยู่บนเป้าหมายให้นานที่สุดตลอดช่วงเวลา</p>
+          <p>ไม่ต้องคลิก เมาส์อย่างเดียว</p>
+        </div>
+
+        <div class="panel">
+          <h3>หลักการวัด</h3>
+          <ul>
+            <li>Time on Target</li>
+            <li>Mean Distance Error</li>
+            <li>RMSE</li>
+          </ul>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
