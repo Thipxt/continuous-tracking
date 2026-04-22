@@ -9,6 +9,8 @@ const overlay = document.getElementById("countdownOverlay");
 const patternSelect = document.getElementById("patternSelect");
 const durationSelect = document.getElementById("durationSelect");
 const seedInput = document.getElementById("seedInput");
+const sensitivityInput = document.getElementById("sensitivityInput");
+const sensitivityValue = document.getElementById("sensitivityValue");
 const startBtn = document.getElementById("startBtn");
 const resetBtn = document.getElementById("resetBtn");
 
@@ -22,6 +24,14 @@ hud.render({
   state: "idle",
   timeLeft: 0,
   metrics: null
+});
+
+engine.setSensitivity(sensitivityInput.value);
+sensitivityValue.textContent = Number(sensitivityInput.value).toFixed(1);
+
+sensitivityInput.addEventListener("input", () => {
+  engine.setSensitivity(sensitivityInput.value);
+  sensitivityValue.textContent = Number(sensitivityInput.value).toFixed(1);
 });
 
 startBtn.addEventListener("click", () => {
@@ -38,4 +48,5 @@ startBtn.addEventListener("click", () => {
 
 resetBtn.addEventListener("click", () => {
   engine.reset();
+  engine.setSensitivity(sensitivityInput.value);
 });

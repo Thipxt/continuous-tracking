@@ -23,7 +23,10 @@ export class GameEngine {
     this.pointer = {
       x: CONFIG.canvas.width / 2,
       y: CONFIG.canvas.height / 2,
-      inside: false
+      inside: false,
+      sensitivity: CONFIG.input.defaultSensitivity,
+      rawLastX: null,
+      rawLastY: null
     };
 
     this.target = {
@@ -52,13 +55,40 @@ export class GameEngine {
       const scaleX = this.canvas.width / rect.width;
       const scaleY = this.canvas.height / rect.height;
 
-      this.pointer.x = (e.clientX - rect.left) * scaleX;
-      this.pointer.y = (e.clientY - rect.top) * scaleY;
+      const rawX = (e.clientX - rect.left) * scaleX;
+      const rawY = (e.clientY - rect.top) * scaleY;
+
+      if (
+        !this.pointer.inside ||
+        this.pointer.rawLastX === null ||
+        this.pointer.rawLastY === null
+      ) {
+        this.pointer.x = rawX;
+        this.pointer.y = rawY;
+        this.pointer.rawLastX = rawX;
+        this.pointer.rawLastY = rawY;
+        this.pointer.inside = true;
+        return;
+      }
+
+      const dx = rawX - this.pointer.rawLastX;
+      const dy = rawY - this.pointer.rawLastY;
+
+      this.pointer.x += dx * this.pointer.sensitivity;
+      this.pointer.y += dy * this.pointer.sensitivity;
+
+      this.pointer.x = Math.max(0, Math.min(CONFIG.canvas.width, this.pointer.x));
+      this.pointer.y = Math.max(0, Math.min(CONFIG.canvas.height, this.pointer.y));
+
+      this.pointer.rawLastX = rawX;
+      this.pointer.rawLastY = rawY;
       this.pointer.inside = true;
     });
 
     this.canvas.addEventListener("mouseleave", () => {
       this.pointer.inside = false;
+      this.pointer.rawLastX = null;
+      this.pointer.rawLastY = null;
     });
   }
 
@@ -111,6 +141,9 @@ export class GameEngine {
     this.currentSegmentIndex = 0;
     this.currentSegmentElapsed = 0;
 
+    this.pointer.rawLastX = null;
+    this.pointer.rawLastY = null;
+
     this.hud.render({
       state: TrialState.IDLE,
       timeLeft: 0,
@@ -119,6 +152,16 @@ export class GameEngine {
 
     this.hideOverlay();
     this.render();
+  }
+
+  setSensitivity(value) {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return;
+
+    this.pointer.sensitivity = Math.max(
+      CONFIG.input.minSensitivity,
+      Math.min(CONFIG.input.maxSensitivity, numeric)
+    );
   }
 
   loop(timestamp) {
@@ -174,7 +217,7 @@ export class GameEngine {
 
     this.currentSegmentElapsed += dt;
 
-    const velocity = getVelocityAt(segment, this.currentSegmentElapsed);
+    const velocity = getVelocityAt(segment, this.currentSegmentElapsed, dt);
     this.target.vx = velocity.x;
     this.target.vy = velocity.y;
 
@@ -210,7 +253,16 @@ export class GameEngine {
 
       segment.directionAngle = Math.atan2(dy, dx);
 
-      const reflectedVelocity = getVelocityAt(segment, this.currentSegmentElapsed);
+      if (segment.type === "jitter") {
+        segment.jitterHeadingAngle = segment.directionAngle;
+        segment.jitterHeadingTimer = 0;
+      }
+
+      const reflectedVelocity = getVelocityAt(
+        segment,
+        this.currentSegmentElapsed,
+        dt
+      );
       this.target.vx = reflectedVelocity.x;
       this.target.vy = reflectedVelocity.y;
 

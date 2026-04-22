@@ -14,20 +14,42 @@ export const CONFIG = {
     radius: 6
   },
 
+  input: {
+    defaultSensitivity: 1.0,
+    minSensitivity: 0.3,
+    maxSensitivity: 2.5
+  },
+
   trial: {
     defaultDurationSec: 30,
     preCountdownSec: 3
   },
 
   motion: {
-    baseSpeedPxPerSec: 180,
-    maxSpeedPxPerSec: 260,
-    maxAccelerationPxPerSec2: 420,
-    segmentDurationRangeSec: [2.5, 5.0],
-    jitterNoiseScale: 26,
-    sinusoidAmplitudeRange: [40, 120],
-    sinusoidFrequencyRange: [0.25, 0.8],
-    zigzagTurnIntervalRange: [0.35, 0.85]
+    baseSpeedPxPerSec: 170,
+    maxSpeedPxPerSec: 230,
+    segmentDurationRangeSec: [3.0, 5.5],
+
+    linear: {
+      headingJitterDeg: 6
+    },
+
+    zigzag: {
+      turnIntervalRangeSec: [0.28, 0.5],
+      lateralRatio: 1.15
+    },
+
+    sinusoidal: {
+      amplitudeRange: [55, 110],
+      frequencyRange: [0.22, 0.45],
+      lateralVelocityScale: 1.0
+    },
+
+    jitter: {
+      headingChangeIntervalRangeSec: [0.18, 0.32],
+      maxHeadingStepDeg: 18,
+      driftBlend: 0.82
+    }
   },
 
   scoring: {
