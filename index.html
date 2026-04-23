@@ -9,57 +9,90 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <h1>แบบทดสอบการติดตามเป้าหมายต่อเนื่อง</h1>
+      <div class="topbar-title">
+        <div>
+          <h1>แบบทดสอบการติดตามเป้าหมายต่อเนื่อง</h1>
+          <p class="subtitle">Continuous Tracking • Motor Control • Eye-Hand Coordination</p>
+        </div>
+      </div>
 
-      <div class="controls">
-        <label>
-          รูปแบบ
-          <select id="patternSelect">
-            <option value="mixed">Mixed</option>
-            <option value="linear">Linear</option>
-            <option value="zigzag">Zig-Zag</option>
-            <option value="sinusoidal">Sinusoidal</option>
-            <option value="jitter">Random Jitter</option>
-          </select>
-        </label>
+      <div class="controls-card">
+        <div class="controls-grid">
+          <label>
+            รูปแบบ
+            <select id="patternSelect">
+              <option value="mixed">Mixed</option>
+              <option value="linear">Linear</option>
+              <option value="zigzag">Zig-Zag</option>
+              <option value="sinusoidal">Sinusoidal</option>
+              <option value="jitter">Random Jitter</option>
+            </select>
+          </label>
 
-        <label>
-          ระยะเวลา
-          <select id="durationSelect">
-            <option value="20">20s</option>
-            <option value="30" selected>30s</option>
-            <option value="45">45s</option>
-            <option value="60">60s</option>
-          </select>
-        </label>
+          <label>
+            ระยะเวลา
+            <select id="durationSelect">
+              <option value="20">20s</option>
+              <option value="30" selected>30s</option>
+              <option value="45">45s</option>
+              <option value="60">60s</option>
+            </select>
+          </label>
 
-        <label>
-          Seed
-          <input id="seedInput" type="number" value="20260422" />
-        </label>
+          <label>
+            โหมด Seed
+            <select id="seedModeSelect">
+              <option value="random" selected>Random</option>
+              <option value="fixed">Fixed Seed</option>
+            </select>
+          </label>
 
-        <label>
-          Mouse Sensitivity
-          <input
-            id="sensitivityInput"
-            type="range"
-            min="0.3"
-            max="2.5"
-            step="0.1"
-            value="1.0"
-          />
-          <span id="sensitivityValue">1.0</span>
-        </label>
+          <label id="seedInputGroup" class="seed-group" style="display: none;">
+            Seed
+            <div class="seed-input-row">
+              <input id="seedInput" type="number" value="20260422" />
+              <button id="copySeedBtn" type="button" class="secondary-btn">Copy Seed</button>
+            </div>
+          </label>
 
-        <button id="startBtn">เริ่มทดสอบ</button>
-        <button id="resetBtn">รีเซ็ต</button>
+          <label class="sensitivity-group">
+            Mouse Sensitivity
+            <div class="range-row">
+              <input
+                id="sensitivityInput"
+                type="range"
+                min="0.3"
+                max="2.5"
+                step="0.1"
+                value="1.0"
+              />
+              <span id="sensitivityValue" class="pill">1.0</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="action-row">
+          <button id="startBtn" class="primary-btn">เริ่มทดสอบ</button>
+          <button id="resetBtn" class="secondary-btn">รีเซ็ต</button>
+          <span id="copySeedStatus" class="copy-status"></span>
+        </div>
       </div>
     </header>
 
     <main class="main">
-      <section class="play-area">
-        <canvas id="gameCanvas" width="1000" height="640"></canvas>
-        <div id="countdownOverlay" class="overlay hidden"></div>
+      <section class="play-area-card">
+        <div class="play-area-header">
+          <div>
+            <h2>พื้นที่ทดสอบ</h2>
+            <p>เลื่อนเมาส์ให้เคอร์เซอร์อยู่บนเป้าหมายให้นานที่สุด</p>
+            <p class="play-hint">เมื่อเริ่มทดสอบ เมาส์จะถูกล็อกไว้ในพื้นที่เกม • กด <strong>Esc</strong> เพื่อออกจากการควบคุม และถือว่าจบเกมทันที</p>
+          </div>
+        </div>
+
+        <section class="play-area">
+          <canvas id="gameCanvas" width="1000" height="640"></canvas>
+          <div id="countdownOverlay" class="overlay hidden"></div>
+        </section>
       </section>
 
       <aside class="sidebar">
@@ -67,16 +100,17 @@
 
         <div class="panel">
           <h3>วิธีเล่น</h3>
-          <p>เลื่อนเมาส์ให้เคอร์เซอร์อยู่บนเป้าหมายให้นานที่สุดตลอดช่วงเวลา</p>
-          <p>ไม่ต้องคลิก ใช้เมาส์อย่างเดียว</p>
+          <p>เป้าหมายจะเคลื่อนที่ต่อเนื่องบนจอ ผู้เล่นต้องควบคุมเมาส์ให้ตามเป้าให้ได้นานที่สุด</p>
+          <p>ไม่ต้องคลิก ใช้การควบคุมเมาส์อย่างเดียว</p>
+          <p><strong>กด Esc</strong> เพื่อออกจากการล็อกเมาส์ และระบบจะสรุปผลทันที</p>
         </div>
 
         <div class="panel">
-          <h3>หลักการวัด</h3>
-          <ul>
-            <li>Time on Target</li>
-            <li>Mean Distance Error</li>
-            <li>RMSE</li>
+          <h3>การวัดผล</h3>
+          <ul class="pretty-list">
+            <li><strong>Time on Target</strong> เวลาที่เคอร์เซอร์อยู่บนเป้า</li>
+            <li><strong>Mean Error</strong> ระยะเฉลี่ยจากเคอร์เซอร์ถึงเป้า</li>
+            <li><strong>RMSE</strong> ค่าความคลาดเคลื่อนแบบเน้นการพลาดหนัก</li>
           </ul>
         </div>
       </aside>

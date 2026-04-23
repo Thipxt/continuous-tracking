@@ -44,58 +44,116 @@ export class GameEngine {
     this.lastTimestamp = 0;
     this.rafId = null;
     this.results = null;
+    this.currentSeed = null;
+    this.currentSeedMode = "random";
+    this.isPointerLocked = false;
+    this.unlockRequestedBySystem = false;
 
     this.bindInput();
     this.render();
   }
 
   bindInput() {
-    this.canvas.addEventListener("mousemove", (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const scaleX = this.canvas.width / rect.width;
-      const scaleY = this.canvas.height / rect.height;
+    document.addEventListener("pointerlockchange", () => {
+      const wasLocked = this.isPointerLocked;
+      this.isPointerLocked = document.pointerLockElement === this.canvas;
 
-      const rawX = (e.clientX - rect.left) * scaleX;
-      const rawY = (e.clientY - rect.top) * scaleY;
+      this.canvas.classList.toggle("locked", this.isPointerLocked);
 
-      if (
-        !this.pointer.inside ||
-        this.pointer.rawLastX === null ||
-        this.pointer.rawLastY === null
-      ) {
-        this.pointer.x = rawX;
-        this.pointer.y = rawY;
-        this.pointer.rawLastX = rawX;
-        this.pointer.rawLastY = rawY;
+      if (!this.isPointerLocked) {
+        this.pointer.rawLastX = null;
+        this.pointer.rawLastY = null;
+        this.pointer.inside = false;
+
+        const isActiveTrial =
+          this.trial &&
+          (this.trial.state === TrialState.COUNTDOWN ||
+            this.trial.state === TrialState.RUNNING);
+
+        if (wasLocked && isActiveTrial && !this.unlockRequestedBySystem) {
+          this.forceFinishFromEscape();
+        }
+
+        this.unlockRequestedBySystem = false;
+      } else {
         this.pointer.inside = true;
-        return;
       }
+    });
 
-      const dx = rawX - this.pointer.rawLastX;
-      const dy = rawY - this.pointer.rawLastY;
+    document.addEventListener("mousemove", (e) => {
+      if (!this.isPointerLocked) return;
 
-      this.pointer.x += dx * this.pointer.sensitivity;
-      this.pointer.y += dy * this.pointer.sensitivity;
+      this.pointer.x += e.movementX * this.pointer.sensitivity;
+      this.pointer.y += e.movementY * this.pointer.sensitivity;
 
-      this.pointer.x = Math.max(0, Math.min(CONFIG.canvas.width, this.pointer.x));
-      this.pointer.y = Math.max(0, Math.min(CONFIG.canvas.height, this.pointer.y));
+      this.pointer.x = clamp(this.pointer.x, 0, CONFIG.canvas.width);
+      this.pointer.y = clamp(this.pointer.y, 0, CONFIG.canvas.height);
+      this.pointer.inside = true;
+    });
 
+    this.canvas.addEventListener("mouseenter", (e) => {
+      if (this.isPointerLocked) return;
+
+      const { x, y } = this.getCanvasPoint(e);
+      this.pointer.x = x;
+      this.pointer.y = y;
+      this.pointer.rawLastX = x;
+      this.pointer.rawLastY = y;
+      this.pointer.inside = true;
+    });
+
+    this.canvas.addEventListener("mousemove", (e) => {
+      if (this.isPointerLocked) return;
+
+      const { x: rawX, y: rawY } = this.getCanvasPoint(e);
+
+      this.pointer.x = rawX;
+      this.pointer.y = rawY;
       this.pointer.rawLastX = rawX;
       this.pointer.rawLastY = rawY;
       this.pointer.inside = true;
     });
 
     this.canvas.addEventListener("mouseleave", () => {
+      if (this.isPointerLocked) return;
+
       this.pointer.inside = false;
       this.pointer.rawLastX = null;
       this.pointer.rawLastY = null;
     });
   }
 
-  start({ durationSec, seed, pattern }) {
+  getCanvasPoint(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }
+
+  requestPointerLock() {
+    if (this.canvas.requestPointerLock) {
+      this.canvas.requestPointerLock();
+    }
+  }
+
+  exitPointerLock() {
+    if (document.pointerLockElement) {
+      this.unlockRequestedBySystem = true;
+      document.exitPointerLock();
+    }
+  }
+
+  start({ durationSec, seed, pattern, seedMode = "random" }) {
     this.stop();
 
-    this.rng = new SeededRNG(Number(seed) || 1);
+    this.currentSeed = Number(seed) || 1;
+    this.currentSeedMode = seedMode;
+
+    this.rng = new SeededRNG(this.currentSeed);
     this.pathGenerator = new PathGenerator(this.rng);
 
     this.schedule = this.pathGenerator.createSchedule(durationSec, pattern);
@@ -107,6 +165,12 @@ export class GameEngine {
     this.target.vx = 0;
     this.target.vy = 0;
 
+    this.pointer.x = CONFIG.canvas.width / 2;
+    this.pointer.y = CONFIG.canvas.height / 2;
+    this.pointer.rawLastX = null;
+    this.pointer.rawLastY = null;
+    this.pointer.inside = true;
+
     this.scoring.reset();
     this.results = null;
 
@@ -114,6 +178,15 @@ export class GameEngine {
     this.trial.startCountdown();
 
     this.lastTimestamp = performance.now();
+
+    this.hud.render({
+      state: this.trial.state,
+      timeLeft: 0,
+      metrics: null,
+      seedInfo: this.currentSeed,
+      seedMode: this.currentSeedMode
+    });
+
     this.loop(this.lastTimestamp);
   }
 
@@ -124,7 +197,12 @@ export class GameEngine {
 
   reset() {
     this.stop();
+    this.exitPointerLock();
+
     this.results = null;
+    this.currentSeed = null;
+    this.currentSeedMode = "random";
+
     this.trial = new TrialManager(
       CONFIG.trial.defaultDurationSec,
       CONFIG.trial.preCountdownSec
@@ -137,17 +215,22 @@ export class GameEngine {
     this.target.vx = 0;
     this.target.vy = 0;
 
+    this.pointer.x = CONFIG.canvas.width / 2;
+    this.pointer.y = CONFIG.canvas.height / 2;
+    this.pointer.inside = false;
+    this.pointer.rawLastX = null;
+    this.pointer.rawLastY = null;
+
     this.schedule = [];
     this.currentSegmentIndex = 0;
     this.currentSegmentElapsed = 0;
 
-    this.pointer.rawLastX = null;
-    this.pointer.rawLastY = null;
-
     this.hud.render({
       state: TrialState.IDLE,
       timeLeft: 0,
-      metrics: null
+      metrics: null,
+      seedInfo: "-",
+      seedMode: "random"
     });
 
     this.hideOverlay();
@@ -162,6 +245,39 @@ export class GameEngine {
       CONFIG.input.minSensitivity,
       Math.min(CONFIG.input.maxSensitivity, numeric)
     );
+
+    this.pointer.rawLastX = null;
+    this.pointer.rawLastY = null;
+  }
+
+  getCurrentSeed() {
+    return this.currentSeed;
+  }
+
+  forceFinishFromEscape() {
+    this.stop();
+
+    if (!this.trial) return;
+
+    this.trial.finish();
+    this.results = this.scoring.getResults();
+
+    this.hud.render({
+      state: TrialState.FINISHED,
+      timeLeft: 0,
+      metrics: this.results,
+      seedInfo: this.currentSeed ?? "-",
+      seedMode: this.currentSeedMode
+    });
+
+    this.showOverlay("Esc");
+    window.setTimeout(() => {
+      if (this.trial && this.trial.state === TrialState.FINISHED) {
+        this.hideOverlay();
+      }
+    }, 700);
+
+    this.render();
   }
 
   loop(timestamp) {
@@ -207,7 +323,9 @@ export class GameEngine {
       state: this.trial.state,
       timeLeft:
         this.trial.state === TrialState.RUNNING ? this.trial.getTimeLeft() : 0,
-      metrics: this.results
+      metrics: this.results,
+      seedInfo: this.currentSeed ?? "-",
+      seedMode: this.currentSeedMode
     });
   }
 
@@ -292,9 +410,12 @@ export class GameEngine {
     this.hud.render({
       state: TrialState.FINISHED,
       timeLeft: 0,
-      metrics: this.results
+      metrics: this.results,
+      seedInfo: this.currentSeed ?? "-",
+      seedMode: this.currentSeedMode
     });
 
+    this.exitPointerLock();
     this.render();
   }
 
@@ -314,10 +435,6 @@ export class GameEngine {
     this.drawArena(ctx);
     this.drawTarget(ctx);
     this.drawPointer(ctx);
-
-    if (this.results) {
-      this.drawResultBanner(ctx);
-    }
   }
 
   drawArena(ctx) {
@@ -362,12 +479,11 @@ export class GameEngine {
   }
 
   drawPointer(ctx) {
-    ctx.save();
+    if (!this.pointer.inside) return;
 
+    ctx.save();
     ctx.beginPath();
-    ctx.fillStyle = this.pointer.inside
-      ? CONFIG.colors.text
-      : CONFIG.colors.danger;
+    ctx.fillStyle = CONFIG.colors.text;
     ctx.arc(
       this.pointer.x,
       this.pointer.y,
@@ -376,26 +492,6 @@ export class GameEngine {
       Math.PI * 2
     );
     ctx.fill();
-
-    ctx.restore();
-  }
-
-  drawResultBanner(ctx) {
-    ctx.save();
-    ctx.fillStyle = "rgba(2, 6, 23, 0.82)";
-    ctx.fillRect(20, 20, 320, 108);
-
-    ctx.fillStyle = CONFIG.colors.text;
-    ctx.font = "bold 22px sans-serif";
-    ctx.fillText("ผลการทดสอบ", 36, 52);
-
-    ctx.font = "16px sans-serif";
-    ctx.fillText(
-      `Time on Target: ${this.results.timeOnTargetPct.toFixed(2)}%`,
-      36,
-      82
-    );
-    ctx.fillText(`RMSE: ${this.results.rmse.toFixed(2)} px`, 36, 108);
     ctx.restore();
   }
 }
