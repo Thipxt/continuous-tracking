@@ -105,17 +105,17 @@
             <button id="drawPathBtn" type="button" class="secondary-btn">Draw Path</button>
             <button id="finishPathBtn" type="button" class="secondary-btn">Finish Path</button>
             <button id="clearPathBtn" type="button" class="secondary-btn">Clear Path</button>
-            <button id="copyPathBtn" type="button" class="secondary-btn">Copy Path</button>
+            <button id="copyPathBtn" type="button" class="secondary-btn">Copy Current Path</button>
             <button id="loadPathBtn" type="button" class="secondary-btn">Load Path</button>
           </div>
 
-          <label style="display:block; margin-top: 12px;">
-            Path Data
+          <label class="path-data-label">
+            Load Path Data
             <textarea
               id="pathDataInput"
-              rows="10"
-              style="width:100%; margin-top:8px; padding:12px; border-radius:12px; background:#0f172a; color:#e5e7eb; border:1px solid rgba(148,163,184,0.16); resize:vertical;"
-              placeholder="Path JSON จะปรากฏตรงนี้ หรือวางข้อมูล path ลงมาได้"
+              rows="8"
+              class="path-data-input"
+              placeholder='วาง path JSON ตรงนี้ เช่น {"version":1,"type":"custom_path","points":[...]}'
             ></textarea>
           </label>
 

@@ -56,14 +56,6 @@ function updateSeedModeUI() {
   seedInputGroup.style.display = isFixed ? "flex" : "none";
 }
 
-function updatePathDataText() {
-  if (customPathManager.hasValidPath()) {
-    pathDataInput.value = customPathManager.exportPath();
-  } else if (!customPathManager.isDrawing) {
-    pathDataInput.value = "";
-  }
-}
-
 function updateCustomPathUI() {
   const isCustom = patternSelect.value === "custom";
   customPathPanel.style.display = isCustom ? "block" : "none";
@@ -76,8 +68,6 @@ function updateCustomPathUI() {
     : customPathManager.isDrawing
       ? `กำลังวาด path... (${pointCount} points)`
       : "ยังไม่มี path";
-
-  updatePathDataText();
 }
 
 function updatePatternPreview() {
@@ -96,6 +86,62 @@ function showCopyStatus(message, isError = false) {
   showCopyStatus._timer = window.setTimeout(() => {
     copySeedStatus.textContent = "";
   }, 1800);
+}
+
+function validatePathText(text) {
+  let parsed;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      message: "รูปแบบ JSON ไม่ถูกต้อง"
+    };
+  }
+
+  if (!parsed || parsed.type !== "custom_path") {
+    return {
+      ok: false,
+      message: "ข้อมูลนี้ไม่ใช่ custom_path"
+    };
+  }
+
+  if (!Array.isArray(parsed.points)) {
+    return {
+      ok: false,
+      message: "ไม่พบ points ใน path"
+    };
+  }
+
+  if (parsed.points.length < 2) {
+    return {
+      ok: false,
+      message: "path ต้องมีอย่างน้อย 2 points"
+    };
+  }
+
+  const hasInvalidPoint = parsed.points.some((p) => {
+    return (
+      !p ||
+      typeof p.x !== "number" ||
+      typeof p.y !== "number" ||
+      !Number.isFinite(p.x) ||
+      !Number.isFinite(p.y)
+    );
+  });
+
+  if (hasInvalidPoint) {
+    return {
+      ok: false,
+      message: "points ต้องมีค่า x และ y เป็นตัวเลข"
+    };
+  }
+
+  return {
+    ok: true,
+    message: "Path ใช้งานได้"
+  };
 }
 
 async function copySeedToClipboard() {
@@ -123,9 +169,7 @@ async function copySeedToClipboard() {
 seedModeSelect.addEventListener("change", updateSeedModeUI);
 
 patternSelect.addEventListener("change", () => {
-  // เวลาเปลี่ยนโหมด ให้หยุดเกมที่กำลังรันอยู่ และ reset เป้ากลับตำแหน่งเริ่มต้น
   engine.resetForPatternChange(patternSelect.value, customPathManager);
-
   updateCustomPathUI();
   updatePatternPreview();
 });
@@ -141,6 +185,7 @@ drawPathBtn.addEventListener("click", () => {
   engine.resetForPatternChange("custom", customPathManager);
   customPathManager.startDrawing();
   patternSelect.value = "custom";
+  pathDataInput.value = "";
   updateCustomPathUI();
   updatePatternPreview();
 });
@@ -156,6 +201,7 @@ clearPathBtn.addEventListener("click", () => {
   customPathManager.clear();
   isMouseDownForPath = false;
   pathDataInput.value = "";
+  customPathStatus.textContent = "ล้าง path แล้ว";
   updateCustomPathUI();
   updatePatternPreview();
 });
@@ -167,21 +213,27 @@ copyPathBtn.addEventListener("click", async () => {
   }
 
   const text = customPathManager.exportPath();
-  pathDataInput.value = text;
 
   try {
     await navigator.clipboard.writeText(text);
-    customPathStatus.textContent = "คัดลอก path แล้ว";
+    customPathStatus.textContent = "คัดลอก path แล้ว สามารถนำไปวางในช่อง Load Path Data เพื่อใช้ซ้ำได้";
   } catch {
     customPathStatus.textContent = "คัดลอก path ไม่สำเร็จ";
   }
 });
 
-loadPathBtn.addEventListener("click", async () => {
+loadPathBtn.addEventListener("click", () => {
   const text = pathDataInput.value.trim();
 
   if (!text) {
-    customPathStatus.textContent = "กรุณาวาง path JSON ลงในช่อง Path Data ก่อน";
+    customPathStatus.textContent = "กรุณาวาง path JSON ลงในช่อง Load Path Data ก่อน";
+    return;
+  }
+
+  const validation = validatePathText(text);
+
+  if (!validation.ok) {
+    customPathStatus.textContent = `โหลด path ไม่สำเร็จ: ${validation.message}`;
     return;
   }
 
@@ -189,8 +241,11 @@ loadPathBtn.addEventListener("click", async () => {
     engine.resetForPatternChange("custom", customPathManager);
     customPathManager.importPath(text);
     patternSelect.value = "custom";
+    customPathManager.stopDrawing();
+
     updateCustomPathUI();
     updatePatternPreview();
+
     customPathStatus.textContent = "โหลด path สำเร็จ";
   } catch {
     customPathStatus.textContent = "โหลด path ไม่สำเร็จ หรือข้อมูลไม่ถูกต้อง";
@@ -241,7 +296,7 @@ startBtn.addEventListener("click", () => {
   const seedMode = seedModeSelect.value;
 
   if (pattern === "custom" && !customPathManager.hasValidPath()) {
-    customPathStatus.textContent = "กรุณาวาด path ก่อนเริ่ม";
+    customPathStatus.textContent = "กรุณาวาด path หรือโหลด path ก่อนเริ่ม";
     return;
   }
 
@@ -260,7 +315,6 @@ startBtn.addEventListener("click", () => {
     customPathManager
   });
 
-  // ล็อกเมาส์ทุกโหมด รวมถึง custom
   engine.requestPointerLock();
 
   if (seedMode === "random") {
