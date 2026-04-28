@@ -465,3 +465,7 @@ button:hover {
     font-size: 56px;
   }
 }
+.status-note {
+  color: var(--muted);
+  font-size: 14px;
+}

@@ -26,6 +26,7 @@
               <option value="zigzag">Zig-Zag</option>
               <option value="sinusoidal">Sinusoidal</option>
               <option value="jitter">Random Jitter</option>
+              <option value="custom">Custom Path</option>
             </select>
           </label>
 
@@ -85,7 +86,10 @@
           <div>
             <h2>พื้นที่ทดสอบ</h2>
             <p>เลื่อนเมาส์ให้เคอร์เซอร์อยู่บนเป้าหมายให้นานที่สุด</p>
-            <p class="play-hint">เมื่อเริ่มทดสอบ เมาส์จะถูกล็อกไว้ในพื้นที่เกม • กด <strong>Esc</strong> เพื่อออกจากการควบคุม และถือว่าจบเกมทันที</p>
+            <p class="play-hint">
+              เมื่อเริ่มทดสอบ เมาส์จะถูกล็อกไว้ในพื้นที่เกม • กด <strong>Esc</strong>
+              เพื่อออกจากการควบคุม และถือว่าจบเกมทันที
+            </p>
           </div>
         </div>
 
@@ -93,6 +97,30 @@
           <canvas id="gameCanvas" width="1000" height="640"></canvas>
           <div id="countdownOverlay" class="overlay hidden"></div>
         </section>
+
+        <div id="customPathPanel" class="panel" style="display: none; margin-top: 14px;">
+          <h3>Custom Path</h3>
+
+          <div class="action-row">
+            <button id="drawPathBtn" type="button" class="secondary-btn">Draw Path</button>
+            <button id="finishPathBtn" type="button" class="secondary-btn">Finish Path</button>
+            <button id="clearPathBtn" type="button" class="secondary-btn">Clear Path</button>
+            <button id="copyPathBtn" type="button" class="secondary-btn">Copy Path</button>
+            <button id="loadPathBtn" type="button" class="secondary-btn">Load Path</button>
+          </div>
+
+          <label style="display:block; margin-top: 12px;">
+            Path Data
+            <textarea
+              id="pathDataInput"
+              rows="10"
+              style="width:100%; margin-top:8px; padding:12px; border-radius:12px; background:#0f172a; color:#e5e7eb; border:1px solid rgba(148,163,184,0.16); resize:vertical;"
+              placeholder="Path JSON จะปรากฏตรงนี้ หรือวางข้อมูล path ลงมาได้"
+            ></textarea>
+          </label>
+
+          <p id="customPathStatus" class="status-note">ยังไม่มี path</p>
+        </div>
       </section>
 
       <aside class="sidebar">

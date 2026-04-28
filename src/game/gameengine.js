@@ -49,6 +49,11 @@ export class GameEngine {
     this.isPointerLocked = false;
     this.unlockRequestedBySystem = false;
 
+    this.currentPattern = "mixed";
+    this.previewPattern = "mixed";
+    this.customPathManager = null;
+    this.customPathDistance = 0;
+
     this.bindInput();
     this.render();
   }
@@ -147,16 +152,118 @@ export class GameEngine {
     }
   }
 
-  start({ durationSec, seed, pattern, seedMode = "random" }) {
+  setPreviewPattern(pattern, customPathManager = null) {
+    this.previewPattern = pattern;
+    this.customPathManager = customPathManager;
+
+    const isRunning =
+      this.trial &&
+      (this.trial.state === TrialState.COUNTDOWN ||
+        this.trial.state === TrialState.RUNNING);
+
+    if (!isRunning) {
+      if (
+        pattern === "custom" &&
+        customPathManager &&
+        customPathManager.hasValidPath()
+      ) {
+        const firstPoint = customPathManager.getRenderPoints()[0];
+        this.target.x = firstPoint.x;
+        this.target.y = firstPoint.y;
+      } else {
+        this.target.x = CONFIG.canvas.width / 2;
+        this.target.y = CONFIG.canvas.height / 2;
+      }
+
+      this.target.vx = 0;
+      this.target.vy = 0;
+    }
+
+    this.render();
+  }
+
+  resetForPatternChange(pattern, customPathManager = null) {
+    this.stop();
+    this.exitPointerLock();
+
+    this.results = null;
+    this.currentSeed = null;
+    this.currentSeedMode = "random";
+    this.currentPattern = pattern;
+    this.previewPattern = pattern;
+    this.customPathManager = customPathManager;
+    this.customPathDistance = 0;
+
+    this.trial = new TrialManager(
+      CONFIG.trial.defaultDurationSec,
+      CONFIG.trial.preCountdownSec
+    );
+    this.trial.reset();
+    this.scoring.reset();
+
+    this.schedule = [];
+    this.currentSegmentIndex = 0;
+    this.currentSegmentElapsed = 0;
+
+    this.pointer.x = CONFIG.canvas.width / 2;
+    this.pointer.y = CONFIG.canvas.height / 2;
+    this.pointer.inside = false;
+    this.pointer.rawLastX = null;
+    this.pointer.rawLastY = null;
+
+    if (
+      pattern === "custom" &&
+      customPathManager &&
+      customPathManager.hasValidPath()
+    ) {
+      const firstPoint = customPathManager.getRenderPoints()[0];
+      this.target.x = firstPoint.x;
+      this.target.y = firstPoint.y;
+    } else {
+      this.target.x = CONFIG.canvas.width / 2;
+      this.target.y = CONFIG.canvas.height / 2;
+    }
+
+    this.target.vx = 0;
+    this.target.vy = 0;
+
+    this.hud.render({
+      state: TrialState.IDLE,
+      timeLeft: 0,
+      metrics: null,
+      seedInfo: "-",
+      seedMode: "random"
+    });
+
+    this.hideOverlay();
+    this.render();
+  }
+
+  start({
+    durationSec,
+    seed,
+    pattern,
+    seedMode = "random",
+    customPathManager = null
+  }) {
     this.stop();
 
     this.currentSeed = Number(seed) || 1;
     this.currentSeedMode = seedMode;
+    this.currentPattern = pattern;
+    this.previewPattern = pattern;
+    this.customPathManager = customPathManager;
+    this.customPathDistance = 0;
 
     this.rng = new SeededRNG(this.currentSeed);
     this.pathGenerator = new PathGenerator(this.rng);
 
-    this.schedule = this.pathGenerator.createSchedule(durationSec, pattern);
+    if (pattern !== "custom") {
+      this.schedule = this.pathGenerator.createSchedule(durationSec, pattern);
+    } else {
+      this.schedule = [];
+    }
+
     this.currentSegmentIndex = 0;
     this.currentSegmentElapsed = 0;
 
@@ -164,6 +271,16 @@ export class GameEngine {
     this.target.y = CONFIG.canvas.height / 2;
     this.target.vx = 0;
     this.target.vy = 0;
+
+    if (
+      pattern === "custom" &&
+      this.customPathManager &&
+      this.customPathManager.hasValidPath()
+    ) {
+      const firstPoint = this.customPathManager.getRenderPoints()[0];
+      this.target.x = firstPoint.x;
+      this.target.y = firstPoint.y;
+    }
 
     this.pointer.x = CONFIG.canvas.width / 2;
     this.pointer.y = CONFIG.canvas.height / 2;
@@ -187,6 +304,7 @@ export class GameEngine {
       seedMode: this.currentSeedMode
     });
 
+    this.render();
     this.loop(this.lastTimestamp);
   }
 
@@ -202,6 +320,9 @@ export class GameEngine {
     this.results = null;
     this.currentSeed = null;
     this.currentSeedMode = "random";
+    this.currentPattern = "mixed";
+    this.previewPattern = "mixed";
+    this.customPathDistance = 0;
 
     this.trial = new TrialManager(
       CONFIG.trial.defaultDurationSec,
@@ -312,6 +433,17 @@ export class GameEngine {
     ) {
       this.currentSegmentIndex = 0;
       this.currentSegmentElapsed = 0;
+
+      if (
+        this.currentPattern === "custom" &&
+        this.customPathManager &&
+        this.customPathManager.hasValidPath()
+      ) {
+        const firstPoint = this.customPathManager.getRenderPoints()[0];
+        this.target.x = firstPoint.x;
+        this.target.y = firstPoint.y;
+        this.customPathDistance = 0;
+      }
     }
 
     if (this.trial.state === TrialState.RUNNING) {
@@ -330,6 +462,17 @@ export class GameEngine {
   }
 
   updateTarget(dt) {
+    if (this.currentPattern === "custom" && this.customPathManager?.hasValidPath()) {
+      this.customPathDistance += this.customPathManager.speed * dt;
+
+      const point = this.customPathManager.getPointAtDistance(this.customPathDistance);
+      if (point) {
+        this.target.x = point.x;
+        this.target.y = point.y;
+      }
+      return;
+    }
+
     const segment = this.schedule[this.currentSegmentIndex];
     if (!segment) return;
 
@@ -433,6 +576,7 @@ export class GameEngine {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.drawArena(ctx);
+    this.drawCustomPath(ctx);
     this.drawTarget(ctx);
     this.drawPointer(ctx);
   }
@@ -447,6 +591,37 @@ export class GameEngine {
       CONFIG.canvas.width - CONFIG.canvas.margin * 2,
       CONFIG.canvas.height - CONFIG.canvas.margin * 2
     );
+    ctx.restore();
+  }
+
+  drawCustomPath(ctx) {
+    const shouldShowCustomPath =
+      this.previewPattern === "custom" &&
+      this.customPathManager &&
+      this.customPathManager.points.length >= 2;
+
+    if (!shouldShowCustomPath) return;
+
+    const points = this.customPathManager.getRenderPoints();
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(96, 165, 250, 0.75)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(96, 165, 250, 0.95)";
+    ctx.beginPath();
+    ctx.arc(points[0].x, points[0].y, 5, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 
